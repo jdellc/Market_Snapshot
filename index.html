@@ -1,0 +1,531 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Market Snapshot | J. Dean Enterprises</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:opsz,wght@6..72,500;6..72,600&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  :root {
+    --bg: #2b2421;
+    --panel: #362e2a;
+    --line: #4d423c;
+    --cream: #fff7e6;
+    --muted: #cbbda9;
+    --faint: #a39484;
+    --brand: #9e1616;
+    --up: #4fd896;
+    --down: #ff6f66;
+    --serif: "Newsreader", Georgia, "Times New Roman", serif;
+    --sans: "Public Sans", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--cream); font-family: var(--sans); }
+  body { padding: 32px 20px 60px; }
+  button, input { font: inherit; }
+  :focus-visible { outline: 2px solid var(--cream); outline-offset: 2px; }
+
+  /* Toolbar (not exported) */
+  .toolbar { max-width: 1200px; margin: 0 auto 18px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+  .toggles { display: flex; gap: 10px; flex-wrap: wrap; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { background: transparent; color: var(--muted); border: 0; padding: 8px 16px; cursor: pointer; font-weight: 600; font-size: 14px; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--cream); color: var(--bg); }
+  .actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .btn { background: transparent; color: var(--cream); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; cursor: pointer; font-weight: 600; font-size: 14px; }
+  .btn:hover { border-color: var(--muted); }
+  .btn.primary { background: var(--brand); border-color: var(--brand); }
+  .btn.primary:hover { background: #b51c1c; }
+  .status { color: var(--faint); font-size: 13px; }
+
+  /* Board (exported) */
+  #board { max-width: 1200px; margin: 0 auto; background: var(--bg); padding: 0 0 8px; }
+  .masthead { border-top: 6px solid var(--brand); padding: 26px 4px 22px; display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+  .masthead h1 { font-family: var(--serif); font-weight: 600; font-size: clamp(34px, 5vw, 50px); line-height: 1; margin: 0; letter-spacing: -0.01em; }
+  .masthead .sub { color: var(--muted); font-size: 15px; margin-top: 10px; }
+  .masthead .byline { text-align: right; color: var(--muted); font-size: 14px; line-height: 1.5; }
+  .masthead .byline strong { color: var(--cream); font-weight: 600; }
+
+  /* Grid view */
+  .cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 18px 14px; min-height: 236px; display: flex; flex-direction: column; }
+  .c-id { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .name { font-weight: 700; font-size: 16px; }
+  .unit { color: var(--faint); font-size: 12.5px; }
+  .c-price { font-size: 34px; font-weight: 600; letter-spacing: -0.02em; margin: 14px 0 6px; font-variant-numeric: tabular-nums; }
+  .c-delta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 6px; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .c-delta .arrow { font-size: 12px; }
+  .c-delta.up { color: var(--up); } .c-delta.down { color: var(--down); } .c-delta.flat { color: var(--muted); }
+  .c-delta .note { color: var(--faint); font-weight: 400; }
+  .spark { width: 100%; height: 70px; display: block; margin-top: auto; padding-top: 10px; }
+  .c-foot { display: flex; justify-content: space-between; gap: 8px; color: var(--faint); font-size: 12.5px; margin-top: 8px; font-variant-numeric: tabular-nums; }
+  .msg { color: var(--muted); font-size: 14px; line-height: 1.45; margin: 16px 0 0; }
+  .msg.err { color: var(--down); }
+
+  @media (max-width: 900px) { .cards { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 580px) { .cards { grid-template-columns: 1fr; } body { padding: 20px 14px 40px; } }
+
+  /* List view */
+  .cards.list { display: block; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .cards.list .card {
+    display: grid; align-items: center; gap: 6px 22px; min-height: 0; border: 0; border-radius: 0; background: transparent;
+    padding: 14px 20px; border-bottom: 1px solid var(--line);
+    grid-template-columns: minmax(150px, 1.2fr) minmax(120px, 1fr) minmax(190px, 1.5fr) minmax(170px, 1.6fr) minmax(150px, 1.1fr);
+    grid-template-areas: "id price delta spark foot";
+  }
+  .cards.list .card:last-child { border-bottom: 0; }
+  .cards.list .c-id { grid-area: id; flex-direction: column; gap: 2px; }
+  .cards.list .c-price { grid-area: price; font-size: 22px; margin: 0; }
+  .cards.list .c-delta { grid-area: delta; }
+  .cards.list .spark { grid-area: spark; height: 44px; margin: 0; padding: 0; }
+  .cards.list .c-foot { grid-area: foot; flex-direction: column; gap: 2px; margin: 0; text-align: right; }
+  .cards.list .msg { grid-column: 2 / -1; margin: 0; }
+  @media (max-width: 760px) {
+    .cards.list .card { grid-template-columns: 1fr auto; grid-template-areas: "id price" "delta delta" "spark spark" "foot foot"; }
+    .cards.list .c-price { text-align: right; }
+    .cards.list .c-foot { flex-direction: row; justify-content: space-between; text-align: left; }
+    .cards.list .msg { grid-column: 1 / -1; }
+  }
+
+  .footer { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: var(--faint); font-size: 12.5px; padding: 16px 4px 0; }
+
+  /* Export mode: fixed layout for Substack */
+  #board.exporting { width: 1200px; max-width: none; padding: 8px 28px 24px; }
+  #board.exporting .cards:not(.list) { grid-template-columns: repeat(3, 1fr); }
+  #board.exporting .cards.list .card {
+    grid-template-columns: minmax(150px, 1.2fr) minmax(120px, 1fr) minmax(190px, 1.5fr) minmax(170px, 1.6fr) minmax(150px, 1.1fr);
+    grid-template-areas: "id price delta spark foot";
+  }
+  #board.exporting .cards.list .c-price { text-align: left; }
+  #board.exporting .cards.list .c-foot { flex-direction: column; text-align: right; }
+
+  /* Key setup */
+  .setup { max-width: 520px; margin: 60px auto; background: var(--panel); border: 1px solid var(--line); border-top: 6px solid var(--brand); border-radius: 10px; padding: 28px; }
+  .setup h2 { font-family: var(--serif); font-weight: 600; font-size: 30px; margin: 0 0 10px; }
+  .setup p { color: var(--muted); line-height: 1.55; margin: 0 0 18px; font-size: 15px; }
+  .setup a { color: var(--cream); }
+  .setup label { display: block; font-weight: 600; font-size: 14px; margin-bottom: 6px; }
+  .setup input { width: 100%; background: var(--bg); color: var(--cream); border: 1px solid var(--line); border-radius: 8px; padding: 11px 12px; margin-bottom: 16px; }
+  [hidden] { display: none !important; }
+</style>
+</head>
+<body>
+
+<section class="setup" id="setup" hidden>
+  <h2>Connect your data</h2>
+  <p>Paste your free Alpha Vantage key. It powers Gold, Silver, the S&amp;P 500, WTI Oil, and the 10-Year Treasury. Bitcoin comes from CoinGecko and needs no key. Get a key at <a href="https://www.alphavantage.co/support/#api-key" target="_blank" rel="noopener">alphavantage.co</a>.</p>
+  <label for="keyInput">Alpha Vantage API key</label>
+  <input id="keyInput" type="text" autocomplete="off" spellcheck="false" placeholder="e.g. A1B2C3D4E5F6G7H8">
+  <button class="btn primary" id="saveKey">Load dashboard</button>
+</section>
+
+<div id="app" hidden>
+  <div class="toolbar">
+    <div class="toggles">
+      <div class="seg" id="ranges" role="group" aria-label="Time period">
+        <button data-range="1M">1M</button>
+        <button data-range="6M">6M</button>
+        <button data-range="1Y">1Y</button>
+        <button data-range="5Y">5Y</button>
+      </div>
+      <div class="seg" id="views" role="group" aria-label="Layout">
+        <button data-view="grid">Grid</button>
+        <button data-view="list">List</button>
+      </div>
+    </div>
+    <div class="actions">
+      <span class="status" id="status"></span>
+      <button class="btn" id="refresh">Refresh data</button>
+      <button class="btn" id="changeKey">Change key</button>
+      <button class="btn primary" id="shot">Save image</button>
+    </div>
+  </div>
+
+  <div id="board">
+    <header class="masthead">
+      <div>
+        <h1>Market Snapshot</h1>
+        <div class="sub" id="dateLine"></div>
+      </div>
+      <div class="byline"><strong>J. Dean Enterprises</strong><br><span id="periodLine"></span></div>
+    </header>
+    <main class="cards" id="cards"></main>
+    <footer class="footer">
+      <span>Sources: Alpha Vantage (incl. FRED series), CoinGecko. S&amp;P 500 shown via SPY ETF.</span>
+      <span id="rangeNote"></span>
+    </footer>
+  </div>
+</div>
+
+<script>
+const ASSETS = [
+  { id: "gold",   name: "Gold",             unit: "USD per troy oz", fmt: "usd2" },
+  { id: "silver", name: "Silver",           unit: "USD per troy oz", fmt: "usd2" },
+  { id: "btc",    name: "Bitcoin",          unit: "USD",             fmt: "usd0" },
+  { id: "spx",    name: "S&P 500",          unit: "SPY ETF, USD",    fmt: "usd2" },
+  { id: "wti",    name: "WTI Crude Oil",    unit: "USD per barrel",  fmt: "usd2" },
+  { id: "t10",    name: "10-Year Treasury", unit: "Yield",           fmt: "pct"  }
+];
+const RANGES = {
+  "1M": { days: 31,   ago: "1 month ago",  period: "1-month change",  note: "Charts and change: past month" },
+  "6M": { days: 183,  ago: "6 months ago", period: "6-month change",  note: "Charts and change: past 6 months" },
+  "1Y": { days: 365,  ago: "1 year ago",   period: "1-year change",   note: "Charts and change: past year" },
+  "5Y": { days: 1827, ago: "5 years ago",  period: "5-year change",   note: "Charts and change: past 5 years" }
+};
+const DAY = 86400000;
+const CACHE_KEY = "msd-cache-v1";
+const KEY_KEY = "msd-av-key";
+const PREF_KEY = "msd-prefs";
+const CACHE_HOURS = 12;
+const BG = "#2b2421";
+
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+  del(k) { try { localStorage.removeItem(k); } catch {} }
+};
+const prefs = (() => { try { return JSON.parse(store.get(PREF_KEY)) || {}; } catch { return {}; } })();
+
+const state = { range: RANGES[prefs.range] ? prefs.range : "1Y", view: prefs.view === "list" ? "list" : "grid", key: null, data: {}, btcLongTried: false, updated: null };
+ASSETS.forEach(a => state.data[a.id] = { daily: [], long: null, error: null, loading: true });
+const savePrefs = () => store.set(PREF_KEY, JSON.stringify({ range: state.range, view: state.view }));
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ---------- formatting ----------
+function fmtVal(v, f) {
+  if (f === "pct") return v.toFixed(2) + "%";
+  const d = f === "usd0" ? 0 : 2;
+  return "$" + v.toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+}
+function fmtChange(cur, prev, f) {
+  if (f === "pct") {
+    const bp = Math.round((cur - prev) * 100);
+    return { dir: bp > 0 ? "up" : bp < 0 ? "down" : "flat", text: (bp > 0 ? "+" : bp < 0 ? "−" : "") + Math.abs(bp) + " bp" };
+  }
+  const pct = (cur - prev) / prev * 100;
+  const sign = pct > 0 ? "+" : pct < 0 ? "−" : "";
+  return {
+    dir: pct > 0.005 ? "up" : pct < -0.005 ? "down" : "flat",
+    text: sign + Math.abs(pct).toFixed(2) + "%",
+    abs: sign + fmtVal(Math.abs(cur - prev), f)
+  };
+}
+const fmtDate = t => new Date(t).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
+
+// ---------- series parsing ----------
+function toNum(x) { const n = parseFloat(x); return Number.isFinite(n) ? n : null; }
+function parseSeries(json) {
+  let pts = [];
+  if (Array.isArray(json.data)) {
+    pts = json.data.map(it => {
+      const date = it.date || it.timestamp || it.time;
+      let v = toNum(it.value ?? it.price ?? it.close);
+      if (v === null) for (const k in it) { if (k !== "date") { v = toNum(it[k]); if (v !== null) break; } }
+      return { t: Date.parse(date), v };
+    });
+  } else {
+    const tsKey = Object.keys(json).find(k => /time series/i.test(k));
+    if (tsKey) {
+      pts = Object.entries(json[tsKey]).map(([date, o]) => {
+        const ck = Object.keys(o).find(k => /close/i.test(k) && !/adjusted/i.test(k)) || Object.keys(o)[0];
+        return { t: Date.parse(date), v: toNum(o[ck]) };
+      });
+    }
+  }
+  return pts.filter(p => Number.isFinite(p.t) && p.v !== null).sort((a, b) => a.t - b.t);
+}
+
+// ---------- API calls ----------
+async function av(params) {
+  const url = "https://www.alphavantage.co/query?" + new URLSearchParams({ ...params, apikey: state.key });
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("Alpha Vantage returned an error (" + res.status + ").");
+    const j = await res.json();
+    if (j["Error Message"]) throw new Error("Alpha Vantage rejected this request.");
+    const info = j.Information || j.Note;
+    if (info) {
+      if (/apikey|api key/i.test(info) && /invalid|missing/i.test(info)) throw new Error("Your Alpha Vantage key was not accepted. Use Change key to fix it.");
+      if (/premium/i.test(info)) throw new Error("This series requires an Alpha Vantage premium plan.");
+      if (/per day|daily/i.test(info)) throw new Error("Alpha Vantage's free limit (25 calls/day) is used up. Try again tomorrow.");
+      if (attempt < 2) { await sleep(15000); continue; }
+      throw new Error("Alpha Vantage is rate limiting. Wait a minute, then refresh.");
+    }
+    await sleep(1300);
+    return j;
+  }
+}
+
+async function loadMetal(id, symbols) {
+  let lastErr = null;
+  for (const symbol of symbols) {
+    try {
+      const pts = parseSeries(await av({ function: "GOLD_SILVER_HISTORY", symbol, interval: "daily" }));
+      if (pts.length) return pts;
+    } catch (e) { lastErr = e; if (/limit|key|premium/i.test(e.message)) throw e; }
+  }
+  throw lastErr || new Error("No data returned for " + id + ".");
+}
+
+async function loadBTC() {
+  const res = await fetch("https://api.coingecko.com/api/v3/coins/bitcoin/market_chart?vs_currency=usd&days=365&interval=daily");
+  if (!res.ok) throw new Error("CoinGecko is busy (" + res.status + "). Refresh in a minute.");
+  const j = await res.json();
+  return (j.prices || []).map(([t, v]) => ({ t, v })).filter(p => p.v);
+}
+
+async function loadBTCLong() {
+  return parseSeries(await av({ function: "DIGITAL_CURRENCY_WEEKLY", symbol: "BTC", market: "USD" }));
+}
+
+function setResult(id, patch) {
+  Object.assign(state.data[id], { loading: false }, patch);
+  renderCard(id);
+}
+
+async function loadAll(force) {
+  const cached = !force && readCache();
+  if (cached) {
+    ASSETS.forEach(a => Object.assign(state.data[a.id], cached.data[a.id] || {}, { loading: false, error: null }));
+    state.updated = cached.ts;
+    renderAll(); setStatus();
+    if (state.range === "5Y") ensureBTCLong();
+    return;
+  }
+  ASSETS.forEach(a => Object.assign(state.data[a.id], { daily: [], long: null, error: null, loading: true }));
+  state.btcLongTried = false;
+  renderAll();
+  setStatus("Loading live data…");
+
+  const btcJob = loadBTC().then(d => setResult("btc", { daily: d })).catch(e => setResult("btc", { error: e.message }));
+
+  const jobs = [
+    ["gold",   () => loadMetal("gold", ["GOLD", "XAU"]).then(d => ({ daily: d }))],
+    ["silver", () => loadMetal("silver", ["SILVER", "XAG"]).then(d => ({ daily: d }))],
+    ["spx",    async () => {
+      const daily = parseSeries(await av({ function: "TIME_SERIES_DAILY", symbol: "SPY" }));
+      const long = parseSeries(await av({ function: "TIME_SERIES_WEEKLY", symbol: "SPY" }));
+      return { daily, long };
+    }],
+    ["wti",    async () => ({ daily: parseSeries(await av({ function: "WTI", interval: "daily" })) })],
+    ["t10",    async () => ({ daily: parseSeries(await av({ function: "TREASURY_YIELD", interval: "daily", maturity: "10year" })) })]
+  ];
+  let fatal = null;
+  for (const [id, fn] of jobs) {
+    if (fatal) { setResult(id, { error: fatal }); continue; }
+    try {
+      const r = await fn();
+      if (!r.daily.length) throw new Error("No data returned. Refresh to try again.");
+      setResult(id, r);
+    } catch (e) {
+      setResult(id, { error: e.message });
+      if (/limit|key/i.test(e.message)) fatal = e.message;
+    }
+  }
+  await btcJob;
+  state.updated = Date.now();
+  writeCache();
+  setStatus();
+  if (state.range === "5Y") ensureBTCLong();
+}
+
+async function ensureBTCLong() {
+  const b = state.data.btc;
+  if (b.long || state.btcLongTried || b.error || !b.daily.length) return;
+  state.btcLongTried = true;
+  try { b.long = await loadBTCLong(); writeCache(); } catch (e) { /* keep 1-year data */ }
+  renderCard("btc");
+}
+
+// ---------- cache ----------
+function readCache() {
+  try {
+    const c = JSON.parse(store.get(CACHE_KEY));
+    if (!c || Date.now() - c.ts > CACHE_HOURS * 3600000) return null;
+    const ok = ASSETS.every(a => c.data[a.id] && c.data[a.id].daily && c.data[a.id].daily.length);
+    return ok ? c : null;
+  } catch { return null; }
+}
+function writeCache() {
+  const data = {};
+  ASSETS.forEach(a => { const d = state.data[a.id]; if (!d.error) data[a.id] = { daily: d.daily, long: d.long }; });
+  store.set(CACHE_KEY, JSON.stringify({ ts: state.updated || Date.now(), data }));
+}
+
+// ---------- range math ----------
+// Returns the points for the selected period, starting with the value on (or just before) the period's start date.
+function seriesForRange(d, days) {
+  const daily = d.daily || [];
+  const last = daily[daily.length - 1];
+  if (!last) return [];
+  const start = last.t - days * DAY;
+  let src = daily;
+  if (daily[0].t > start + 3 * DAY && d.long && d.long.length) {
+    src = d.long.filter(p => p.t < daily[0].t).concat(daily);
+  }
+  let i = 0;
+  for (let k = 0; k < src.length; k++) { if (src[k].t <= start) i = k; else break; }
+  return src.slice(i);
+}
+
+// ---------- rendering ----------
+const cardsEl = document.getElementById("cards");
+function buildCards() {
+  cardsEl.innerHTML = ASSETS.map(a => `<article class="card" id="card-${a.id}"></article>`).join("");
+}
+
+function renderCard(id) {
+  const a = ASSETS.find(x => x.id === id);
+  const d = state.data[id];
+  const card = document.getElementById("card-" + id);
+  const head = `<div class="c-id"><span class="name">${a.name}</span><span class="unit">${a.unit}</span></div>`;
+
+  if (d.loading) { card.innerHTML = head + `<p class="msg">Loading…</p>`; return; }
+  if (d.error) { card.innerHTML = head + `<p class="msg err">${d.error}</p>`; return; }
+
+  const R = RANGES[state.range];
+  const pts = seriesForRange(d, R.days);
+  const last = pts[pts.length - 1];
+  const base = pts[0];
+  const ch = fmtChange(last.v, base.v, a.fmt);
+  const arrow = ch.dir === "up" ? "▲" : ch.dir === "down" ? "▼" : "■";
+  const coveredDays = (last.t - base.t) / DAY;
+  const fullPeriod = coveredDays >= R.days * 0.9;
+  const vsLabel = fullPeriod ? "vs. " + R.ago : "vs. " + fmtDate(base.t) + " (earliest available)";
+  let lo = Infinity, hi = -Infinity;
+  pts.forEach(p => { lo = Math.min(lo, p.v); hi = Math.max(hi, p.v); });
+
+  card.innerHTML = head + `
+    <div class="c-price">${fmtVal(last.v, a.fmt)}</div>
+    <div class="c-delta ${ch.dir}"><span class="arrow" aria-hidden="true">${arrow}</span><span>${ch.text}</span>${ch.abs ? `<span class="note">(${ch.abs})</span>` : ""}<span class="note">${vsLabel}</span></div>
+    <canvas class="spark" role="img" aria-label="${a.name} chart, ${R.period} ${ch.text}"></canvas>
+    <div class="c-foot"><span>As of ${fmtDate(last.t)}</span><span>Range ${fmtVal(lo, a.fmt)} – ${fmtVal(hi, a.fmt)}</span></div>`;
+
+  if (pts.length > 1) drawSpark(card.querySelector(".spark"), pts, ch.dir);
+}
+
+function drawSpark(canvas, pts, dir) {
+  const dpr = Math.max(window.devicePixelRatio || 1, 2);
+  const cs = getComputedStyle(canvas);
+  const w = canvas.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight) || 300;
+  const h = canvas.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom) || 60;
+  canvas.width = w * dpr; canvas.height = h * dpr;
+  const ctx = canvas.getContext("2d");
+  ctx.scale(dpr, dpr);
+  const color = dir === "up" ? "#4fd896" : dir === "down" ? "#ff6f66" : "#cbbda9";
+  let min = Infinity, max = -Infinity;
+  pts.forEach(p => { min = Math.min(min, p.v); max = Math.max(max, p.v); });
+  const pad = (max - min) * 0.08 || 1;
+  min -= pad; max += pad;
+  const t0 = pts[0].t, t1 = pts[pts.length - 1].t;
+  const x = t => ((t - t0) / (t1 - t0 || 1)) * (w - 4) + 1;
+  const y = v => h - 2 - ((v - min) / (max - min)) * (h - 6);
+
+  // dashed line at the period's starting value
+  ctx.strokeStyle = "#5d5049"; ctx.lineWidth = 1; ctx.setLineDash([3, 4]);
+  ctx.beginPath(); ctx.moveTo(0, y(pts[0].v)); ctx.lineTo(w, y(pts[0].v)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, color + "45"); grad.addColorStop(1, color + "00");
+  ctx.beginPath();
+  pts.forEach((p, i) => i ? ctx.lineTo(x(p.t), y(p.v)) : ctx.moveTo(x(p.t), y(p.v)));
+  ctx.lineTo(x(t1), h); ctx.lineTo(x(t0), h); ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+
+  ctx.beginPath();
+  pts.forEach((p, i) => i ? ctx.lineTo(x(p.t), y(p.v)) : ctx.moveTo(x(p.t), y(p.v)));
+  ctx.strokeStyle = color; ctx.lineWidth = 2; ctx.lineJoin = "round"; ctx.stroke();
+
+  const lp = pts[pts.length - 1];
+  ctx.beginPath(); ctx.arc(x(lp.t), y(lp.v), 3, 0, Math.PI * 2); ctx.fillStyle = color; ctx.fill();
+}
+
+function renderAll() {
+  const R = RANGES[state.range];
+  cardsEl.classList.toggle("list", state.view === "list");
+  document.getElementById("periodLine").textContent = R.period;
+  document.getElementById("rangeNote").textContent = R.note;
+  document.querySelectorAll("#ranges button").forEach(b => b.setAttribute("aria-pressed", b.dataset.range === state.range ? "true" : "false"));
+  document.querySelectorAll("#views button").forEach(b => b.setAttribute("aria-pressed", b.dataset.view === state.view ? "true" : "false"));
+  ASSETS.forEach(a => renderCard(a.id));
+}
+
+function setStatus(text) {
+  const el = document.getElementById("status");
+  if (text) { el.textContent = text; return; }
+  if (!state.updated) { el.textContent = ""; return; }
+  const mins = Math.round((Date.now() - state.updated) / 60000);
+  el.textContent = mins < 1 ? "Updated just now" : mins < 60 ? `Updated ${mins} min ago` : `Updated ${Math.round(mins / 60)} hr ago`;
+}
+
+// ---------- screenshot ----------
+async function saveImage() {
+  const btn = document.getElementById("shot");
+  const board = document.getElementById("board");
+  if (typeof html2canvas !== "function") { alert("The screenshot library didn't load. Check your internet connection and reload."); return; }
+  btn.disabled = true; btn.textContent = "Saving…";
+  board.classList.add("exporting");
+  renderAll();
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  try {
+    if (document.fonts && document.fonts.ready) await document.fonts.ready;
+    const canvas = await html2canvas(board, { scale: 1456 / 1200, backgroundColor: BG, useCORS: true, logging: false });
+    const a = document.createElement("a");
+    a.href = canvas.toDataURL("image/png");
+    a.download = "market-snapshot-" + state.range + "-" + new Date().toISOString().slice(0, 10) + ".png";
+    document.body.appendChild(a); a.click(); a.remove();
+    btn.textContent = "Saved";
+  } catch (e) {
+    alert("Couldn't create the image: " + e.message);
+    btn.textContent = "Save image";
+  } finally {
+    board.classList.remove("exporting");
+    renderAll();
+    setTimeout(() => { btn.disabled = false; btn.textContent = "Save image"; }, 1500);
+  }
+}
+
+// ---------- wiring ----------
+function start() {
+  document.getElementById("setup").hidden = true;
+  document.getElementById("app").hidden = false;
+  document.getElementById("dateLine").textContent = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
+  buildCards();
+  loadAll(false);
+}
+
+document.getElementById("saveKey").addEventListener("click", () => {
+  const v = document.getElementById("keyInput").value.trim();
+  if (!v) { document.getElementById("keyInput").focus(); return; }
+  if (v !== state.key) store.del(CACHE_KEY);
+  state.key = v; store.set(KEY_KEY, v); start();
+});
+document.getElementById("keyInput").addEventListener("keydown", e => { if (e.key === "Enter") document.getElementById("saveKey").click(); });
+document.getElementById("changeKey").addEventListener("click", () => {
+  document.getElementById("app").hidden = true;
+  document.getElementById("setup").hidden = false;
+  document.getElementById("keyInput").value = state.key || "";
+  document.getElementById("keyInput").focus();
+});
+document.getElementById("refresh").addEventListener("click", () => loadAll(true));
+document.getElementById("shot").addEventListener("click", saveImage);
+document.querySelectorAll("#ranges button").forEach(b => b.addEventListener("click", () => {
+  state.range = b.dataset.range; savePrefs(); renderAll();
+  if (state.range === "5Y") ensureBTCLong();
+}));
+document.querySelectorAll("#views button").forEach(b => b.addEventListener("click", () => {
+  state.view = b.dataset.view; savePrefs(); renderAll();
+}));
+let rt; window.addEventListener("resize", () => { clearTimeout(rt); rt = setTimeout(renderAll, 150); });
+setInterval(() => setStatus(), 60000);
+
+state.key = store.get(KEY_KEY);
+if (state.key) start(); else document.getElementById("setup").hidden = false;
+</script>
+</body>
+</html>
